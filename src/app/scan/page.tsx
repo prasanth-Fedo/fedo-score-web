@@ -208,7 +208,7 @@ export default function ScanPage() {
             <Button
               onClick={startMeasurement}
               fullWidth
-              disabled={!cameraReady || !faceDetected}
+              disabled={!cameraReady}
               className="py-4 rounded-full"
             >
               {appState === "result" ? "Scan Again" : "Start Scan"}

@@ -52,15 +52,34 @@ export function createCanvasDetector(): FaceDetector {
   let ready = false;
   let prevBbox: [number, number, number, number] | null = null;
 
-  // Lazy init MediaPipe FaceMesh
+  // Lazy init MediaPipe FaceMesh (retries until CDN script loads)
+  let initAttempts = 0;
+  let initTimer: ReturnType<typeof setInterval> | null = null;
+
   async function init() {
     if (faceMesh) return;
     // @ts-ignore — loaded from CDN at runtime
     const FaceMesh = (window as any).FaceMesh;
     if (!FaceMesh) {
-      console.warn("FaceMesh not loaded yet");
+      // CDN script not loaded yet — retry every 500ms (up to 30 attempts = 15s)
+      if (initAttempts < 30 && !initTimer) {
+        initTimer = setInterval(() => {
+          initAttempts++;
+          const FM = (window as any).FaceMesh;
+          if (FM) {
+            if (initTimer) clearInterval(initTimer);
+            initTimer = null;
+            init();
+          } else if (initAttempts >= 30) {
+            if (initTimer) clearInterval(initTimer);
+            initTimer = null;
+            console.warn("FaceMesh CDN failed to load after 15s — using fallback detector");
+          }
+        }, 500);
+      }
       return;
     }
+    if (initTimer) { clearInterval(initTimer); initTimer = null; }
     faceMesh = new FaceMesh({
       locateFile: (file: string) =>
         `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
