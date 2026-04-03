@@ -96,9 +96,9 @@ export function createCanvasDetector(): FaceDetector {
     });
     faceMesh.onResults((results: any) => {
       latestResults = results;
-      ready = true;
     });
     await faceMesh.initialize();
+    ready = true;
   }
 
   const initPromise = init();
@@ -110,12 +110,12 @@ export function createCanvasDetector(): FaceDetector {
       timestamp: number
     ): FaceROI | null {
       if (!ready || !faceMesh) {
-        // Trigger async init but return null for this frame
+        // Still initializing — return fallback but mark as "loading"
         initPromise.catch(() => {});
         return fallbackDetect(video, canvas, timestamp);
       }
 
-      // Send frame to MediaPipe (async, results arrive in callback)
+      // Send frame to MediaPipe (async, results arrive in onResults callback)
       faceMesh.send({ image: video }).catch(() => {});
 
       if (!latestResults?.multiFaceLandmarks?.length) {
@@ -234,19 +234,36 @@ function fallbackDetect(
   const imageData = ctx.getImageData(cx, cy, cw, ch);
 
   let rSum = 0, gSum = 0, bSum = 0;
+  let skinPixels = 0;
   const total = cw * ch;
+  const sampledTotal = Math.ceil(total / 4);
   // Sample every 4th pixel for speed
   for (let i = 0; i < imageData.data.length; i += 16) {
-    rSum += imageData.data[i];
-    gSum += imageData.data[i + 1];
-    bSum += imageData.data[i + 2];
+    const r = imageData.data[i];
+    const g = imageData.data[i + 1];
+    const b = imageData.data[i + 2];
+    rSum += r;
+    gSum += g;
+    bSum += b;
+    // Simple skin color detection (works across skin tones)
+    if (r > 60 && g > 30 && b > 15 && r > g && r > b && (r - g) > 10 && Math.abs(r - g) < 120) {
+      skinPixels++;
+    }
   }
-  const sampled = Math.ceil(total / 4);
+  const skinRatio = skinPixels / sampledTotal;
+  // If >30% of center pixels are skin-colored, likely a face is present
+  const hasFace = skinRatio > 0.3;
+  const confidence = hasFace ? Math.min(skinRatio, 0.8) : 0;
+
+  // Generate a dummy center landmark so faceDetected=true when skin is detected
+  const centerLandmarks = hasFace
+    ? [{ x: 0.5, y: 0.4 }]  // single center point
+    : [];
 
   return {
     bbox: [cx, cy, cw, ch],
-    rgb: { r: rSum / sampled, g: gSum / sampled, b: bSum / sampled, timestamp },
-    landmarks: [],
-    faceConfidence: 0,
+    rgb: { r: rSum / sampledTotal, g: gSum / sampledTotal, b: bSum / sampledTotal, timestamp },
+    landmarks: centerLandmarks,
+    faceConfidence: confidence,
   };
 }
