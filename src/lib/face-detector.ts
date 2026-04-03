@@ -52,34 +52,38 @@ export function createCanvasDetector(): FaceDetector {
   let ready = false;
   let prevBbox: [number, number, number, number] | null = null;
 
-  // Lazy init MediaPipe FaceMesh (retries until CDN script loads)
-  let initAttempts = 0;
-  let initTimer: ReturnType<typeof setInterval> | null = null;
+  // Load MediaPipe FaceMesh by injecting script tag directly
+  function loadScript(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).FaceMesh) { resolve(); return; }
+      const existing = document.querySelector(`script[src="${src}"]`);
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        if ((window as any).FaceMesh) resolve();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load MediaPipe FaceMesh"));
+      document.head.appendChild(script);
+    });
+  }
 
   async function init() {
     if (faceMesh) return;
-    // @ts-ignore — loaded from CDN at runtime
-    const FaceMesh = (window as any).FaceMesh;
-    if (!FaceMesh) {
-      // CDN script not loaded yet — retry every 500ms (up to 30 attempts = 15s)
-      if (initAttempts < 30 && !initTimer) {
-        initTimer = setInterval(() => {
-          initAttempts++;
-          const FM = (window as any).FaceMesh;
-          if (FM) {
-            if (initTimer) clearInterval(initTimer);
-            initTimer = null;
-            init();
-          } else if (initAttempts >= 30) {
-            if (initTimer) clearInterval(initTimer);
-            initTimer = null;
-            console.warn("FaceMesh CDN failed to load after 15s — using fallback detector");
-          }
-        }, 500);
-      }
+    try {
+      await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js");
+    } catch (e) {
+      console.warn("FaceMesh CDN failed to load — using fallback detector");
       return;
     }
-    if (initTimer) { clearInterval(initTimer); initTimer = null; }
+    const FaceMesh = (window as any).FaceMesh;
+    if (!FaceMesh) {
+      console.warn("FaceMesh global not found after script load");
+      return;
+    }
     faceMesh = new FaceMesh({
       locateFile: (file: string) =>
         `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,

@@ -61,13 +61,6 @@ export default function ScanPage() {
 
   return (
     <>
-      {/* MediaPipe CDN script */}
-      <script
-        src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"
-        crossOrigin="anonymous"
-        async
-      />
-
       <main className="min-h-screen flex flex-col items-center px-4 py-6 max-w-xl mx-auto">
         {/* Header */}
         <div className="w-full flex items-center justify-between mb-4">
