@@ -6,7 +6,7 @@
  * values of the forehead + cheeks skin region for each frame.
  */
 
-import type { RGBSample } from "./rppg-engine";
+import type { RGBSample } from "./types";
 
 // ---------------------------------------------------------------------------
 // FaceMesh landmark indices for skin ROI (forehead + both cheeks)
@@ -26,6 +26,8 @@ export interface FaceROI {
   rgb: RGBSample;
   /** Normalized landmarks for drawing the mesh */
   landmarks: Array<{ x: number; y: number }>;
+  /** Face detection confidence 0-1 (ratio of valid landmarks found) */
+  faceConfidence: number;
 }
 
 export interface FaceDetector {
@@ -41,10 +43,14 @@ export interface FaceDetector {
  * Create a lightweight face detector that uses a hidden canvas to
  * read pixels.  MediaPipe FaceMesh is loaded lazily on first call.
  */
+// BBox EMA smoothing factor (0.9 = fast tracking, matches Python backend config)
+const BBOX_SMOOTH_ALPHA = 0.9;
+
 export function createCanvasDetector(): FaceDetector {
   let faceMesh: any = null;
   let latestResults: any = null;
   let ready = false;
+  let prevBbox: [number, number, number, number] | null = null;
 
   // Lazy init MediaPipe FaceMesh
   async function init() {
@@ -110,6 +116,27 @@ export function createCanvasDetector(): FaceDetector {
         if (py > yMax) yMax = py;
       }
 
+      // EMA-smooth the bounding box to reduce ROI jitter between frames
+      let rawBbox: [number, number, number, number] = [xMin, yMin, xMax - xMin, yMax - yMin];
+      if (prevBbox) {
+        const a = BBOX_SMOOTH_ALPHA;
+        rawBbox = [
+          a * rawBbox[0] + (1 - a) * prevBbox[0],
+          a * rawBbox[1] + (1 - a) * prevBbox[1],
+          a * rawBbox[2] + (1 - a) * prevBbox[2],
+          a * rawBbox[3] + (1 - a) * prevBbox[3],
+        ];
+      }
+      prevBbox = rawBbox;
+
+      // Face confidence: ratio of valid in-bounds landmarks
+      let validCount = 0;
+      for (let i = 0; i < landmarks.length; i++) {
+        const lm = landmarks[i];
+        if (lm && lm.x >= 0 && lm.x <= 1 && lm.y >= 0 && lm.y <= 1) validCount++;
+      }
+      const faceConfidence = validCount / 468;
+
       // Extract mean RGB from skin landmarks
       const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
       canvas.width = w;
@@ -125,9 +152,9 @@ export function createCanvasDetector(): FaceDetector {
         const py = Math.round(lm.y * h);
         if (px < 0 || px >= w || py < 0 || py >= h) continue;
 
-        // Sample a 3x3 patch around each landmark for robustness
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
+        // Sample a 5x5 patch around each landmark (reduces noise ~1.6x vs 3x3)
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
             const sx = Math.min(Math.max(px + dx, 0), w - 1);
             const sy = Math.min(Math.max(py + dy, 0), h - 1);
             const off = (sy * w + sx) * 4;
@@ -142,9 +169,10 @@ export function createCanvasDetector(): FaceDetector {
       if (count === 0) return fallbackDetect(video, canvas, timestamp);
 
       return {
-        bbox: [xMin, yMin, xMax - xMin, yMax - yMin],
+        bbox: rawBbox,
         rgb: { r: rSum / count, g: gSum / count, b: bSum / count, timestamp },
         landmarks: landmarks.map((lm: any) => ({ x: lm.x, y: lm.y })),
+        faceConfidence,
       };
     },
 
@@ -196,5 +224,6 @@ function fallbackDetect(
     bbox: [cx, cy, cw, ch],
     rgb: { r: rSum / sampled, g: gSum / sampled, b: bSum / sampled, timestamp },
     landmarks: [],
+    faceConfidence: 0,
   };
 }

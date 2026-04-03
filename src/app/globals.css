@@ -1,3 +1,123 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-warm-50 text-cream-800 font-body;
+  }
+
+  /* Prevent overscroll bounce on iOS */
+  html, body {
+    overscroll-behavior: none;
+  }
+}
+
+@layer components {
+  /* Glassmorphism card variants */
+  .glass-card {
+    @apply bg-white/60 backdrop-blur-md border border-white/40 shadow-sm;
+  }
+
+  .glass-elevated {
+    @apply bg-white/80 backdrop-blur-lg border border-white/50 shadow-lg;
+  }
+
+  .glass-colored {
+    @apply backdrop-blur-md border border-white/30 shadow-md;
+  }
+
+  /* Shimmer loading text */
+  .shimmer-text {
+    background: linear-gradient(
+      90deg,
+      theme("colors.cream.400") 0%,
+      theme("colors.warm.400") 50%,
+      theme("colors.cream.400") 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Warm gradient button */
+  .btn-warm {
+    @apply bg-gradient-to-r from-warm-400 to-warm-500 text-white font-display font-semibold
+           rounded-button px-6 py-3 shadow-md
+           hover:from-warm-500 hover:to-warm-600
+           active:from-warm-600 active:to-warm-700
+           transition-all duration-200 ease-out;
+  }
+
+  .btn-warm-outline {
+    @apply border-2 border-warm-300 text-warm-600 font-display font-semibold
+           rounded-button px-6 py-3
+           hover:bg-warm-50 hover:border-warm-400
+           transition-all duration-200 ease-out;
+  }
+
+  .btn-ghost {
+    @apply text-cream-500 font-display font-medium
+           rounded-button px-4 py-2
+           hover:bg-cream-100 hover:text-cream-700
+           transition-all duration-200 ease-out;
+  }
+
+  /* Status badges */
+  .badge-good {
+    @apply bg-health-good/10 text-health-good border border-health-good/20;
+  }
+
+  .badge-fair {
+    @apply bg-health-fair/10 text-health-fair border border-health-fair/20;
+  }
+
+  .badge-warning {
+    @apply bg-health-warning/10 text-health-warning border border-health-warning/20;
+  }
+
+  .badge-danger {
+    @apply bg-health-danger/10 text-health-danger border border-health-danger/20;
+  }
+
+  /* Vital card hover */
+  .vital-card {
+    @apply glass-elevated rounded-card p-4
+           transition-all duration-300 ease-out
+           hover:scale-[1.02] hover:shadow-xl;
+  }
+
+  /* Recording pulse dot */
+  .rec-dot {
+    @apply w-3 h-3 rounded-full bg-red-500;
+    animation: breathe 1.2s ease-in-out infinite;
+  }
+}
+
+@layer utilities {
+  /* Staggered animation delay utilities */
+  .anim-delay-100 { animation-delay: 100ms; }
+  .anim-delay-200 { animation-delay: 200ms; }
+  .anim-delay-300 { animation-delay: 300ms; }
+  .anim-delay-400 { animation-delay: 400ms; }
+  .anim-delay-500 { animation-delay: 500ms; }
+  .anim-delay-600 { animation-delay: 600ms; }
+  .anim-delay-700 { animation-delay: 700ms; }
+  .anim-delay-800 { animation-delay: 800ms; }
+
+  /* Hide scrollbar but allow scroll */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
